@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>影片字幕搜尋播放器</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* 自定義字體 */
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        /* 自定義滾動條樣式 */
+        #searchResults::-webkit-scrollbar {
+            width: 8px;
+        }
+        #searchResults::-webkit-scrollbar-track {
+            background: #2d3748; /* gray-800 */
+        }
+        #searchResults::-webkit-scrollbar-thumb {
+            background: #4a5568; /* gray-600 */
+            border-radius: 4px;
+        }
+        #searchResults::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* gray-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <!-- 主容器 -->
+    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+        
+        <!-- 標題 -->
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">進階影片字幕播放器</h1>
+            <p class="text-gray-400 mt-2">上傳影片與字幕檔 (.vtt, .srt)，即可搜尋字幕內容並快速跳轉</p>
+        </header>
+
+        <!-- 主要內容區域 -->
+        <main class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
+            
+            <!-- 左側：播放器與控制項 -->
+            <div class="flex-grow lg:w-2/3 bg-gray-800 rounded-xl shadow-2xl p-4">
+                <!-- 影片播放器 -->
+                <div class="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                    <video id="videoPlayer" class="w-full h-full" controls>
+                        <!-- 字幕軌道將會動態加入此處 -->
+                        <p class="text-white p-4">請先上傳影片檔案。</p>
+                    </video>
+                </div>
+
+                <!-- 上傳控制項 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <label for="videoUpload" class="block text-lg font-semibold mb-2 text-blue-300">1. 上傳影片</label>
+                        <input type="file" id="videoUpload" accept="video/*" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer transition"/>
+                    </div>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <label for="subtitleUpload" class="block text-lg font-semibold mb-2 text-green-300">2. 上傳字幕 (.vtt, .srt)</label>
+                        <input type="file" id="subtitleUpload" accept=".vtt,.srt" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer transition"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：搜尋與結果 -->
+            <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[60vh] lg:h-auto">
+                <h2 class="text-2xl font-bold mb-4 text-center lg:text-left">搜尋字幕</h2>
+                <div class="relative mb-4">
+                    <input type="text" id="searchInput" placeholder="在這裡輸入關鍵字..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition">
+                    <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div id="searchResults" class="flex-grow overflow-y-auto pr-2">
+                    <!-- 搜尋結果將會顯示在此處 -->
+                    <div class="flex items-center justify-center h-full">
+                        <p class="text-gray-500">尚未有搜尋結果。</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <script>
+        // 等待 DOM 完全載入後執行
+        document.addEventListener('DOMContentLoaded', () => {
+            // 獲取所有需要的 DOM 元素
+            const videoPlayer = document.getElementById('videoPlayer');
+            const videoUpload = document.getElementById('videoUpload');
+            const subtitleUpload = document.getElementById('subtitleUpload');
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
+
+            let subtitleTrack = null; // 用於儲存字幕軌道的變數
+            let currentCues = []; // 用於儲存當前字幕的所有 cue
+
+            // --- 影片檔案上傳的事件監聽器 ---
+            videoUpload.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const videoURL = URL.createObjectURL(file);
+                    videoPlayer.src = videoURL;
+                    videoPlayer.load();
+                }
+            });
+
+            // --- 字幕檔案上傳的事件監聽器 ---
+            subtitleUpload.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // 如果是 srt 檔案，先轉換成 vtt
+                if (file.name.toLowerCase().endsWith('.srt')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const srtContent = e.target.result;
+                        const vttContent = convertSrtToVtt(srtContent);
+                        const vttBlob = new Blob([vttContent], { type: 'text/vtt' });
+                        const vttUrl = URL.createObjectURL(vttBlob);
+                        setupSubtitleTrack(vttUrl);
+                    };
+                    reader.readAsText(file);
+                } else { // 否則直接使用 vtt 檔案
+                    const subtitleURL = URL.createObjectURL(file);
+                    setupSubtitleTrack(subtitleURL);
+                }
+            });
+
+            /**
+             * 將 SRT 格式的字幕內容轉換為 VTT 格式
+             * @param {string} srtText - SRT 格式的字幕內容
+             * @returns {string} VTT 格式的字幕內容
+             */
+            function convertSrtToVtt(srtText) {
+                // 為 VTT 加上必要的檔頭
+                let vttText = "WEBVTT\n\n";
+                // 將 SRT 的時間戳中的逗號替換為 VTT 使用的句點
+                // 並移除 SRT 的數字索引行
+                const processedSrt = srtText
+                    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2') // 替換時間戳中的逗號
+                    .replace(/^\d+\s*$/gm, ''); // 移除數字索引
+
+                // 按區塊分割並清理空行
+                vttText += processedSrt
+                    .split(/\n\n+/)
+                    .map(block => block.trim())
+                    .filter(block => block)
+                    .join('\n\n');
+                
+                return vttText;
+            }
+            
+            /**
+             * 設定影片的字幕軌道
+             * @param {string} subtitleURL - 字幕檔案的 Object URL
+             */
+            function setupSubtitleTrack(subtitleURL) {
+                // 移除舊的字幕軌道以避免衝突
+                const oldTrack = videoPlayer.querySelector('track');
+                if (oldTrack) {
+                    // 釋放舊的 Object URL 以避免記憶體洩漏
+                    if (oldTrack.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(oldTrack.src);
+                    }
+                    oldTrack.remove();
+                }
+                
+                subtitleTrack = null;
+                currentCues = [];
+                // 清空搜尋結果
+                performSearch();
+
+                const trackElement = document.createElement('track');
+                trackElement.kind = 'subtitles';
+                trackElement.label = '上傳字幕';
+                trackElement.srclang = 'zh'; // 假設為中文，可自訂
+                trackElement.src = subtitleURL;
+                trackElement.default = true;
+
+                // 當字幕軌道成功載入後，我們可以存取其內容
+                trackElement.addEventListener('load', () => {
+                    // 需要將軌道模式設為 'showing' 或 'hidden' 才能存取 cues
+                    videoPlayer.textTracks[0].mode = 'showing'; 
+                    subtitleTrack = videoPlayer.textTracks[0];
+                    
+                    // 確保 cues 已經載入 (有時需要一點時間)
+                    setTimeout(() => {
+                        if (subtitleTrack && subtitleTrack.cues) {
+                            currentCues = Array.from(subtitleTrack.cues);
+                            console.log(`字幕軌已載入，共 ${currentCues.length} 條字幕。`);
+                            // 如果搜尋框已有文字，則執行一次搜尋
+                            performSearch();
+                        }
+                    }, 150); // 稍微增加延遲以確保轉換後的字幕能被讀取
+                });
+
+                videoPlayer.appendChild(trackElement);
+            }
+
+
+            // --- 搜尋輸入框的事件監聽器 ---
+            searchInput.addEventListener('input', performSearch);
+
+            // --- 將秒數格式化為 HH:MM:SS 的輔助函式 ---
+            function formatTime(seconds) {
+                return new Date(seconds * 1000).toISOString().substr(11, 8);
+            }
+
+            // --- 執行搜尋的函式 ---
+            function performSearch() {
+                const searchTerm = searchInput.value.trim().toLowerCase();
+                searchResults.innerHTML = ''; // 清空先前的結果
+
+                if (!subtitleTrack || currentCues.length === 0) {
+                    searchResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">請先上傳有效的字幕檔案。</p></div>';
+                    return;
+                }
+
+                if (searchTerm === '') {
+                    searchResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">尚未有搜尋結果。</p></div>';
+                    return;
+                }
+
+                const matchingCues = currentCues.filter(cue => cue.text.toLowerCase().includes(searchTerm));
+
+                if (matchingCues.length === 0) {
+                    searchResults.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-400">找不到包含 "${searchInput.value}" 的字幕。</p></div>`;
+                } else {
+                    matchingCues.forEach(cue => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'p-3 mb-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-blue-600 hover:text-white transition-colors duration-200';
+                        
+                        // 建立高亮顯示的文字
+                        const highlightedText = cue.text.replace(new RegExp(searchTerm, 'gi'), (match) => `<span class="bg-yellow-400 text-black font-bold">${match}</span>`);
+
+                        resultItem.innerHTML = `
+                            <div class="font-mono text-sm text-blue-300 mb-1">[${formatTime(cue.startTime)}]</div>
+                            <div class="text-gray-200">${highlightedText.replace(/\n/g, '<br>')}</div>
+                        `;
+
+                        // 點擊結果項目時，跳轉影片時間
+                        resultItem.addEventListener('click', () => {
+                            videoPlayer.currentTime = cue.startTime;
+                            if (videoPlayer.paused) {
+                                videoPlayer.play();
+                            }
+                        });
+
+                        searchResults.appendChild(resultItem);
+                    });
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
