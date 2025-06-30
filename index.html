@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>影片字幕搜尋播放器</title>
+    <title>AI 影片字幕分析播放器</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Google Fonts -->
@@ -16,18 +16,30 @@
             font-family: 'Noto Sans TC', sans-serif;
         }
         /* 自定義滾動條樣式 */
-        #searchResults::-webkit-scrollbar {
+        .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
         }
-        #searchResults::-webkit-scrollbar-track {
+        .custom-scrollbar::-webkit-scrollbar-track {
             background: #2d3748; /* gray-800 */
         }
-        #searchResults::-webkit-scrollbar-thumb {
+        .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #4a5568; /* gray-600 */
             border-radius: 4px;
         }
-        #searchResults::-webkit-scrollbar-thumb:hover {
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #718096; /* gray-500 */
+        }
+        /* Tab 樣式 */
+        .tab-btn.active {
+            background-color: #4A5568; /* gray-600 */
+            color: #E2E8F0; /* gray-200 */
+        }
+        /* 隱藏 Tab 內容 */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
         }
     </style>
 </head>
@@ -38,15 +50,15 @@
         
         <!-- 標題 -->
         <header class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-white">進階影片字幕播放器</h1>
-            <p class="text-gray-400 mt-2">上傳影片與字幕檔 (.vtt, .srt)，即可搜尋字幕內容並快速跳轉</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-white">AI 影片字幕分析播放器</h1>
+            <p class="text-gray-400 mt-2">上傳影片與字幕，使用 Gemini AI 分析影片主題</p>
         </header>
 
         <!-- 主要內容區域 -->
         <main class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
             
             <!-- 左側：播放器與控制項 -->
-            <div class="flex-grow lg:w-2/3 bg-gray-800 rounded-xl shadow-2xl p-4">
+            <div class="flex-grow lg:w-2/3 bg-gray-800 rounded-xl shadow-2xl p-4 flex flex-col">
                 <!-- 影片播放器 -->
                 <div class="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
                     <video id="videoPlayer" class="w-full h-full" controls>
@@ -56,7 +68,7 @@
                 </div>
 
                 <!-- 上傳控制項 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div class="bg-gray-700 p-4 rounded-lg">
                         <label for="videoUpload" class="block text-lg font-semibold mb-2 text-blue-300">1. 上傳影片</label>
                         <input type="file" id="videoUpload" accept="video/*" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer transition"/>
@@ -66,21 +78,55 @@
                         <input type="file" id="subtitleUpload" accept=".vtt,.srt" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer transition"/>
                     </div>
                 </div>
+                
+                <!-- AI 分析控制項 -->
+                <div class="bg-gray-700 p-4 rounded-lg">
+                    <label class="block text-lg font-semibold mb-2 text-purple-300">3. AI 主題分析</label>
+                    <input type="password" id="apiKeyInput" placeholder="在此輸入您的 Gemini API Key" class="w-full mb-3 bg-gray-600 border-2 border-gray-500 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-purple-500 transition">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                         <select id="languageSelect" class="flex-grow bg-gray-600 border-2 border-gray-500 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-purple-500 transition">
+                            <option value="繁體中文">繁體中文</option>
+                            <option value="English">English</option>
+                            <option value="日本語">日本語</option>
+                            <option value="한국어">한국어</option>
+                            <option value="Français">Français</option>
+                            <option value="Español">Español</option>
+                        </select>
+                        <button id="analyzeButton" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200 flex items-center justify-center disabled:bg-gray-500 disabled:cursor-not-allowed sm:w-auto w-full mt-2 sm:mt-0">
+                            <svg id="analyzeIcon" class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 01-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 013.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 013.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 01-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.25 22.5l-.648-1.947a4.5 4.5 0 01-3.09-3.09L9.75 18l1.947-.648a4.5 4.5 0 013.09-3.09L16.25 12l.648 1.947a4.5 4.5 0 013.09 3.09L22.5 18l-1.947.648a4.5 4.5 0 01-3.09 3.09z" /></svg>
+                            <svg id="loadingSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            分析主題
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- 右側：搜尋與結果 -->
-            <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[60vh] lg:h-auto">
-                <h2 class="text-2xl font-bold mb-4 text-center lg:text-left">搜尋字幕</h2>
-                <div class="relative mb-4">
-                    <input type="text" id="searchInput" placeholder="在這裡輸入關鍵字..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition">
-                    <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+            <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[70vh] lg:h-auto">
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-700 mb-4">
+                    <button id="tab-search" class="tab-btn flex-1 py-2 px-4 text-gray-400 font-semibold rounded-t-lg transition active">字幕搜尋</button>
+                    <button id="tab-analysis" class="tab-btn flex-1 py-2 px-4 text-gray-400 font-semibold rounded-t-lg transition">主題分析</button>
                 </div>
-                <div id="searchResults" class="flex-grow overflow-y-auto pr-2">
-                    <!-- 搜尋結果將會顯示在此處 -->
-                    <div class="flex items-center justify-center h-full">
-                        <p class="text-gray-500">尚未有搜尋結果。</p>
+
+                <!-- Tab Content: Search -->
+                <div id="content-search" class="tab-content active flex-grow flex flex-col">
+                    <div class="relative mb-4">
+                        <input type="text" id="searchInput" placeholder="在這裡輸入關鍵字..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-blue-500 transition">
+                        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <div id="searchResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="flex items-center justify-center h-full"><p class="text-gray-500">尚未有搜尋結果。</p></div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Analysis -->
+                <div id="content-analysis" class="tab-content flex-grow flex flex-col">
+                    <div id="analysisResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="flex items-center justify-center h-full"><p class="text-gray-500">點擊「分析主題」以開始。</p></div>
                     </div>
                 </div>
             </aside>
@@ -88,34 +134,65 @@
     </div>
 
     <script>
-        // 等待 DOM 完全載入後執行
         document.addEventListener('DOMContentLoaded', () => {
-            // 獲取所有需要的 DOM 元素
+            // --- DOM 元素 ---
             const videoPlayer = document.getElementById('videoPlayer');
             const videoUpload = document.getElementById('videoUpload');
             const subtitleUpload = document.getElementById('subtitleUpload');
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const languageSelect = document.getElementById('languageSelect');
+            const analyzeButton = document.getElementById('analyzeButton');
             const searchInput = document.getElementById('searchInput');
             const searchResults = document.getElementById('searchResults');
+            const analysisResults = document.getElementById('analysisResults');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const analyzeIcon = document.getElementById('analyzeIcon');
+            const tabSearch = document.getElementById('tab-search');
+            const tabAnalysis = document.getElementById('tab-analysis');
+            const contentSearch = document.getElementById('content-search');
+            const contentAnalysis = document.getElementById('content-analysis');
 
-            let subtitleTrack = null; // 用於儲存字幕軌道的變數
-            let currentCues = []; // 用於儲存當前字幕的所有 cue
+            // --- 狀態變數 ---
+            let subtitleTrack = null;
+            let currentCues = [];
 
-            // --- 影片檔案上傳的事件監聽器 ---
-            videoUpload.addEventListener('change', (event) => {
+            // --- 事件監聽器 ---
+            videoUpload.addEventListener('change', handleVideoUpload);
+            subtitleUpload.addEventListener('change', handleSubtitleUpload);
+            searchInput.addEventListener('input', performSearch);
+            analyzeButton.addEventListener('click', handleAnalyzeClick);
+            tabSearch.addEventListener('click', () => switchTab('search'));
+            tabAnalysis.addEventListener('click', () => switchTab('analysis'));
+
+            // --- 函式 ---
+
+            function switchTab(tabName) {
+                if (tabName === 'search') {
+                    tabSearch.classList.add('active');
+                    tabAnalysis.classList.remove('active');
+                    contentSearch.classList.add('active');
+                    contentAnalysis.classList.remove('active');
+                } else {
+                    tabAnalysis.classList.add('active');
+                    tabSearch.classList.remove('active');
+                    contentAnalysis.classList.add('active');
+                    contentSearch.classList.remove('active');
+                }
+            }
+
+            function handleVideoUpload(event) {
                 const file = event.target.files[0];
                 if (file) {
                     const videoURL = URL.createObjectURL(file);
                     videoPlayer.src = videoURL;
                     videoPlayer.load();
                 }
-            });
+            }
 
-            // --- 字幕檔案上傳的事件監聽器 ---
-            subtitleUpload.addEventListener('change', (event) => {
+            function handleSubtitleUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
 
-                // 如果是 srt 檔案，先轉換成 vtt
                 if (file.name.toLowerCase().endsWith('.srt')) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
@@ -126,45 +203,28 @@
                         setupSubtitleTrack(vttUrl);
                     };
                     reader.readAsText(file);
-                } else { // 否則直接使用 vtt 檔案
+                } else {
                     const subtitleURL = URL.createObjectURL(file);
                     setupSubtitleTrack(subtitleURL);
                 }
-            });
+            }
 
-            /**
-             * 將 SRT 格式的字幕內容轉換為 VTT 格式
-             * @param {string} srtText - SRT 格式的字幕內容
-             * @returns {string} VTT 格式的字幕內容
-             */
             function convertSrtToVtt(srtText) {
-                // 為 VTT 加上必要的檔頭
                 let vttText = "WEBVTT\n\n";
-                // 將 SRT 的時間戳中的逗號替換為 VTT 使用的句點
-                // 並移除 SRT 的數字索引行
                 const processedSrt = srtText
-                    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2') // 替換時間戳中的逗號
-                    .replace(/^\d+\s*$/gm, ''); // 移除數字索引
-
-                // 按區塊分割並清理空行
+                    .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+                    .replace(/^\d+\s*$/gm, '');
                 vttText += processedSrt
                     .split(/\n\n+/)
                     .map(block => block.trim())
                     .filter(block => block)
                     .join('\n\n');
-                
                 return vttText;
             }
             
-            /**
-             * 設定影片的字幕軌道
-             * @param {string} subtitleURL - 字幕檔案的 Object URL
-             */
             function setupSubtitleTrack(subtitleURL) {
-                // 移除舊的字幕軌道以避免衝突
                 const oldTrack = videoPlayer.querySelector('track');
                 if (oldTrack) {
-                    // 釋放舊的 Object URL 以避免記憶體洩漏
                     if (oldTrack.src.startsWith('blob:')) {
                         URL.revokeObjectURL(oldTrack.src);
                     }
@@ -173,49 +233,39 @@
                 
                 subtitleTrack = null;
                 currentCues = [];
-                // 清空搜尋結果
                 performSearch();
 
                 const trackElement = document.createElement('track');
                 trackElement.kind = 'subtitles';
                 trackElement.label = '上傳字幕';
-                trackElement.srclang = 'zh'; // 假設為中文，可自訂
+                trackElement.srclang = 'zh';
                 trackElement.src = subtitleURL;
                 trackElement.default = true;
 
-                // 當字幕軌道成功載入後，我們可以存取其內容
                 trackElement.addEventListener('load', () => {
-                    // 需要將軌道模式設為 'showing' 或 'hidden' 才能存取 cues
                     videoPlayer.textTracks[0].mode = 'showing'; 
                     subtitleTrack = videoPlayer.textTracks[0];
                     
-                    // 確保 cues 已經載入 (有時需要一點時間)
                     setTimeout(() => {
                         if (subtitleTrack && subtitleTrack.cues) {
                             currentCues = Array.from(subtitleTrack.cues);
                             console.log(`字幕軌已載入，共 ${currentCues.length} 條字幕。`);
-                            // 如果搜尋框已有文字，則執行一次搜尋
                             performSearch();
                         }
-                    }, 150); // 稍微增加延遲以確保轉換後的字幕能被讀取
+                    }, 150);
                 });
 
                 videoPlayer.appendChild(trackElement);
             }
 
-
-            // --- 搜尋輸入框的事件監聽器 ---
-            searchInput.addEventListener('input', performSearch);
-
-            // --- 將秒數格式化為 HH:MM:SS 的輔助函式 ---
             function formatTime(seconds) {
+                if (isNaN(seconds)) return '00:00:00';
                 return new Date(seconds * 1000).toISOString().substr(11, 8);
             }
 
-            // --- 執行搜尋的函式 ---
             function performSearch() {
                 const searchTerm = searchInput.value.trim().toLowerCase();
-                searchResults.innerHTML = ''; // 清空先前的結果
+                searchResults.innerHTML = '';
 
                 if (!subtitleTrack || currentCues.length === 0) {
                     searchResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">請先上傳有效的字幕檔案。</p></div>';
@@ -235,27 +285,172 @@
                     matchingCues.forEach(cue => {
                         const resultItem = document.createElement('div');
                         resultItem.className = 'p-3 mb-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-blue-600 hover:text-white transition-colors duration-200';
-                        
-                        // 建立高亮顯示的文字
                         const highlightedText = cue.text.replace(new RegExp(searchTerm, 'gi'), (match) => `<span class="bg-yellow-400 text-black font-bold">${match}</span>`);
-
                         resultItem.innerHTML = `
                             <div class="font-mono text-sm text-blue-300 mb-1">[${formatTime(cue.startTime)}]</div>
                             <div class="text-gray-200">${highlightedText.replace(/\n/g, '<br>')}</div>
                         `;
-
-                        // 點擊結果項目時，跳轉影片時間
                         resultItem.addEventListener('click', () => {
                             videoPlayer.currentTime = cue.startTime;
-                            if (videoPlayer.paused) {
-                                videoPlayer.play();
-                            }
+                            if (videoPlayer.paused) videoPlayer.play();
                         });
-
                         searchResults.appendChild(resultItem);
                     });
                 }
             }
+
+            function toggleLoading(isLoading) {
+                if (isLoading) {
+                    analyzeButton.disabled = true;
+                    loadingSpinner.classList.remove('hidden');
+                    analyzeIcon.classList.add('hidden');
+                } else {
+                    analyzeButton.disabled = false;
+                    loadingSpinner.classList.add('hidden');
+                    analyzeIcon.classList.remove('hidden');
+                }
+            }
+
+            async function handleAnalyzeClick() {
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    renderAnalysisError("請先輸入您的 Gemini API Key。");
+                    switchTab('analysis');
+                    return;
+                }
+                if (currentCues.length === 0) {
+                    renderAnalysisError("請先上傳字幕檔案。");
+                    switchTab('analysis');
+                    return;
+                }
+
+                toggleLoading(true);
+                analysisResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-400">正在分析中，請稍候...</p></div>';
+                switchTab('analysis');
+
+                try {
+                    const selectedLang = languageSelect.value;
+                    // 將分析間隔改為 180 秒 (3 分鐘)
+                    const chunks = chunkSubtitlesByTime(currentCues, 180); 
+                    
+                    const analysisPromises = chunks.map(chunk => callGeminiAPI(chunk, apiKey, selectedLang));
+                    const results = await Promise.all(analysisPromises);
+                    
+                    renderAnalysisResults(results.filter(r => r));
+                } catch (error) {
+                    console.error("分析失敗:", error);
+                    renderAnalysisError(`分析失敗: ${error.message}`);
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            function chunkSubtitlesByTime(cues, intervalSeconds) {
+                if (!cues || cues.length === 0) return [];
+                const chunks = [];
+                let currentChunkCues = [];
+                let segmentIndex = 0;
+
+                for (const cue of cues) {
+                    const cueSegmentIndex = Math.floor(cue.startTime / intervalSeconds);
+
+                    if (cueSegmentIndex > segmentIndex) {
+                        if (currentChunkCues.length > 0) {
+                            const chunkText = currentChunkCues.map(c => `[${formatTime(c.startTime)}] ${c.text}`).join('\n');
+                            chunks.push({ text: chunkText, startTime: currentChunkCues[0].startTime });
+                        }
+                        currentChunkCues = [cue];
+                        segmentIndex = cueSegmentIndex;
+                    } else {
+                        currentChunkCues.push(cue);
+                    }
+                }
+
+                // 確保最後一個片段也被加入
+                if (currentChunkCues.length > 0) {
+                    const chunkText = currentChunkCues.map(c => `[${formatTime(c.startTime)}] ${c.text}`).join('\n');
+                    chunks.push({ text: chunkText, startTime: currentChunkCues[0].startTime });
+                }
+                return chunks;
+            }
+
+            async function callGeminiAPI(chunk, apiKey, language) {
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const prompt = `你是一位影片內容分析師。請總結以下字幕文字片段的核心主題。你的回答必須是單一的 JSON 物件，且不包含任何額外的文字或 markdown 標記。JSON 物件必須包含以下三個鍵：'topic' (字串，簡短的主題標題)、'description' (字串，對主題的1-2句話描述)、'startTime' (數字，此主題開始的秒數，請直接使用字幕時間戳的第一個時間點)。你的回答必須使用【${language}】。
+
+字幕文字如下：
+
+${chunk.text}`;
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error?.message || `HTTP 錯誤! 狀態: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    if (!data.candidates || data.candidates.length === 0) {
+                        throw new Error("API 回應中不包含有效的候選答案。");
+                    }
+                    const content = data.candidates[0].content.parts[0].text;
+                    const cleanedContent = content.replace(/```json\n?|```/g, '').trim();
+                    return JSON.parse(cleanedContent);
+                } catch (error) {
+                    console.error('Gemini API 呼叫失敗:', error);
+                    // 讓 Promise.all 知道此請求失敗，但不要中斷所有請求
+                    // 回傳一個帶有錯誤訊息的物件，以便統一處理
+                    return { error: true, message: error.message, startTime: chunk.startTime };
+                }
+            }
+
+            function renderAnalysisResults(results) {
+                analysisResults.innerHTML = '';
+                if (results.length === 0) {
+                    analysisResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-400">分析完成，但未偵測到明確主題。</p></div>';
+                    return;
+                }
+
+                results.forEach(item => {
+                    if (item.error) {
+                        // 渲染錯誤項目
+                        const errorItem = document.createElement('div');
+                        errorItem.className = 'p-4 mb-3 bg-red-900 text-red-200 rounded-lg';
+                        errorItem.innerHTML = `
+                            <div class="font-bold">片段 [${formatTime(item.startTime)}] 分析失敗</div>
+                            <p class="text-sm">${item.message}</p>
+                        `;
+                        analysisResults.appendChild(errorItem);
+                    } else {
+                        // 渲染成功項目
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'p-4 mb-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-purple-600 hover:text-white transition-colors duration-200';
+                        resultItem.innerHTML = `
+                            <div class="flex items-center mb-2">
+                                <span class="font-mono text-sm text-purple-300 mr-3">[${formatTime(item.startTime)}]</span>
+                                <h3 class="font-bold text-lg">${item.topic || '未命名主題'}</h3>
+                            </div>
+                            <p class="text-gray-300 text-sm">${item.description || '沒有描述。'}</p>
+                        `;
+                        resultItem.addEventListener('click', () => {
+                            videoPlayer.currentTime = item.startTime;
+                            if (videoPlayer.paused) videoPlayer.play();
+                        });
+                        analysisResults.appendChild(resultItem);
+                    }
+                });
+            }
+
+            function renderAnalysisError(message) {
+                analysisResults.innerHTML = `<div class="p-4 bg-red-900 text-red-200 rounded-lg">${message}</div>`;
+            }
+
         });
     </script>
 
