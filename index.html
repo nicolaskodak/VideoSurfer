@@ -41,6 +41,14 @@
         .tab-content.active {
             display: block;
         }
+        /* 結果淡入動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -101,6 +109,16 @@
                             分析主題
                         </button>
                     </div>
+                    <!-- 進度條 -->
+                    <div id="progressContainer" class="mt-3 hidden">
+                        <div class="flex justify-between text-sm text-gray-300 mb-1">
+                            <span id="progressLabel">分析進度</span>
+                            <span id="progressText">0 / 0</span>
+                        </div>
+                        <div class="w-full bg-gray-600 rounded-full h-2.5">
+                            <div id="progressBar" class="bg-purple-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -152,7 +170,12 @@
             const contentSearch = document.getElementById('content-search');
             const contentAnalysis = document.getElementById('content-analysis');
 
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
             // --- 狀態變數 ---
+            const MAX_CONCURRENCY = 3;
             let subtitleTrack = null;
             let currentCues = [];
 
@@ -311,6 +334,33 @@
                 }
             }
 
+            function updateProgress(completed, total) {
+                const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `${completed} / ${total}`;
+            }
+
+            async function runWithConcurrency(tasks, concurrency, onTaskDone) {
+                let index = 0;
+                let completed = 0;
+                const total = tasks.length;
+
+                async function worker() {
+                    while (index < total) {
+                        const currentIndex = index++;
+                        const result = await tasks[currentIndex]();
+                        completed++;
+                        onTaskDone(result, currentIndex, completed, total);
+                    }
+                }
+
+                const workers = Array.from(
+                    { length: Math.min(concurrency, total) },
+                    () => worker()
+                );
+                await Promise.all(workers);
+            }
+
             async function handleAnalyzeClick() {
                 const apiKey = apiKeyInput.value.trim();
                 if (!apiKey) {
@@ -325,23 +375,40 @@
                 }
 
                 toggleLoading(true);
-                analysisResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-400">正在分析中，請稍候...</p></div>';
+                analysisResults.innerHTML = '';
                 switchTab('analysis');
 
-                try {
-                    const selectedLang = languageSelect.value;
-                    // 將分析間隔改為 180 秒 (3 分鐘)
-                    const chunks = chunkSubtitlesByTime(currentCues, 180); 
-                    
-                    const analysisPromises = chunks.map(chunk => callGeminiAPI(chunk, apiKey, selectedLang));
-                    const results = await Promise.all(analysisPromises);
-                    
-                    renderAnalysisResults(results.filter(r => r));
-                } catch (error) {
-                    console.error("分析失敗:", error);
-                    renderAnalysisError(`分析失敗: ${error.message}`);
-                } finally {
-                    toggleLoading(false);
+                const selectedLang = languageSelect.value;
+                const chunks = chunkSubtitlesByTime(currentCues, 180);
+
+                // 顯示進度條
+                progressContainer.classList.remove('hidden');
+                updateProgress(0, chunks.length);
+
+                // 預先建立佔位元素，確保結果按時間順序排列
+                const placeholders = chunks.map((_, i) => {
+                    const el = document.createElement('div');
+                    el.id = `analysis-slot-${i}`;
+                    analysisResults.appendChild(el);
+                    return el;
+                });
+
+                const tasks = chunks.map((chunk, i) => () => callGeminiAPI(chunk, apiKey, selectedLang));
+
+                await runWithConcurrency(tasks, MAX_CONCURRENCY, (result, idx, completed, total) => {
+                    updateProgress(completed, total);
+                    renderSingleResult(placeholders[idx], result);
+                });
+
+                toggleLoading(false);
+
+                // 分析完成後短暫顯示 100%，然後隱藏進度條
+                setTimeout(() => {
+                    progressContainer.classList.add('hidden');
+                }, 1500);
+
+                if (analysisResults.querySelectorAll('[data-result]').length === 0) {
+                    analysisResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-400">分析完成，但未偵測到明確主題。</p></div>';
                 }
             }
 
@@ -410,41 +477,30 @@ ${chunk.text}`;
                 }
             }
 
-            function renderAnalysisResults(results) {
-                analysisResults.innerHTML = '';
-                if (results.length === 0) {
-                    analysisResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-400">分析完成，但未偵測到明確主題。</p></div>';
-                    return;
-                }
+            function renderSingleResult(placeholder, item) {
+                if (!item) return;
+                placeholder.setAttribute('data-result', 'true');
 
-                results.forEach(item => {
-                    if (item.error) {
-                        // 渲染錯誤項目
-                        const errorItem = document.createElement('div');
-                        errorItem.className = 'p-4 mb-3 bg-red-900 text-red-200 rounded-lg';
-                        errorItem.innerHTML = `
-                            <div class="font-bold">片段 [${formatTime(item.startTime)}] 分析失敗</div>
-                            <p class="text-sm">${item.message}</p>
-                        `;
-                        analysisResults.appendChild(errorItem);
-                    } else {
-                        // 渲染成功項目
-                        const resultItem = document.createElement('div');
-                        resultItem.className = 'p-4 mb-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-purple-600 hover:text-white transition-colors duration-200';
-                        resultItem.innerHTML = `
-                            <div class="flex items-center mb-2">
-                                <span class="font-mono text-sm text-purple-300 mr-3">[${formatTime(item.startTime)}]</span>
-                                <h3 class="font-bold text-lg">${item.topic || '未命名主題'}</h3>
-                            </div>
-                            <p class="text-gray-300 text-sm">${item.description || '沒有描述。'}</p>
-                        `;
-                        resultItem.addEventListener('click', () => {
-                            videoPlayer.currentTime = item.startTime;
-                            if (videoPlayer.paused) videoPlayer.play();
-                        });
-                        analysisResults.appendChild(resultItem);
-                    }
-                });
+                if (item.error) {
+                    placeholder.className = 'p-4 mb-3 bg-red-900 text-red-200 rounded-lg animate-fadeIn';
+                    placeholder.innerHTML = `
+                        <div class="font-bold">片段 [${formatTime(item.startTime)}] 分析失敗</div>
+                        <p class="text-sm">${item.message}</p>
+                    `;
+                } else {
+                    placeholder.className = 'p-4 mb-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-purple-600 hover:text-white transition-colors duration-200 animate-fadeIn';
+                    placeholder.innerHTML = `
+                        <div class="flex items-center mb-2">
+                            <span class="font-mono text-sm text-purple-300 mr-3">[${formatTime(item.startTime)}]</span>
+                            <h3 class="font-bold text-lg">${item.topic || '未命名主題'}</h3>
+                        </div>
+                        <p class="text-gray-300 text-sm">${item.description || '沒有描述。'}</p>
+                    `;
+                    placeholder.addEventListener('click', () => {
+                        videoPlayer.currentTime = item.startTime;
+                        if (videoPlayer.paused) videoPlayer.play();
+                    });
+                }
             }
 
             function renderAnalysisError(message) {
