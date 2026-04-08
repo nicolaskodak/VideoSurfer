@@ -39,7 +39,7 @@
             display: none;
         }
         .tab-content.active {
-            display: block;
+            display: flex;
         }
         /* 結果淡入動畫 */
         @keyframes fadeIn {
@@ -123,7 +123,7 @@
             </div>
 
             <!-- 右側：搜尋與結果 -->
-            <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[70vh] lg:h-[80vh] overflow-hidden">
+            <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[70vh] lg:h-[80vh]">
                 <!-- Tabs -->
                 <div class="flex border-b border-gray-700 mb-4">
                     <button id="tab-search" class="tab-btn flex-1 py-2 px-4 text-gray-400 font-semibold rounded-t-lg transition active">字幕搜尋</button>
@@ -143,6 +143,17 @@
 
                 <!-- Tab Content: Analysis -->
                 <div id="content-analysis" class="tab-content flex-grow flex flex-col min-h-0">
+                    <div class="flex gap-2 mb-3 shrink-0">
+                        <button id="exportButton" class="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center">
+                            <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                            匯出分析
+                        </button>
+                        <label id="importButton" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center cursor-pointer">
+                            <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                            匯入分析
+                            <input type="file" id="importFile" accept=".json" class="hidden">
+                        </label>
+                    </div>
                     <div id="analysisResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0">
                         <div class="flex items-center justify-center h-full"><p class="text-gray-500">點擊「分析主題」以開始。</p></div>
                     </div>
@@ -173,17 +184,22 @@
             const progressContainer = document.getElementById('progressContainer');
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
+            const exportButton = document.getElementById('exportButton');
+            const importFile = document.getElementById('importFile');
 
             // --- 狀態變數 ---
             const MAX_CONCURRENCY = 3;
             let subtitleTrack = null;
             let currentCues = [];
+            let analysisData = []; // 儲存分析結果供匯出
 
             // --- 事件監聽器 ---
             videoUpload.addEventListener('change', handleVideoUpload);
             subtitleUpload.addEventListener('change', handleSubtitleUpload);
             searchInput.addEventListener('input', performSearch);
             analyzeButton.addEventListener('click', handleAnalyzeClick);
+            exportButton.addEventListener('click', handleExport);
+            importFile.addEventListener('change', handleImport);
             tabSearch.addEventListener('click', () => switchTab('search'));
             tabAnalysis.addEventListener('click', () => switchTab('analysis'));
 
@@ -375,6 +391,7 @@
 
                 toggleLoading(true);
                 analysisResults.innerHTML = '';
+                analysisData = [];
                 switchTab('analysis');
 
                 const selectedLang = languageSelect.value;
@@ -385,6 +402,7 @@
                 updateProgress(0, chunks.length);
 
                 // 預先建立佔位元素，確保結果按時間順序排列
+                const resultSlots = new Array(chunks.length).fill(null);
                 const placeholders = chunks.map((_, i) => {
                     const el = document.createElement('div');
                     el.id = `analysis-slot-${i}`;
@@ -396,8 +414,11 @@
 
                 await runWithConcurrency(tasks, MAX_CONCURRENCY, (result, idx, completed, total) => {
                     updateProgress(completed, total);
+                    resultSlots[idx] = result;
                     renderSingleResult(placeholders[idx], result);
                 });
+
+                analysisData = resultSlots.filter(r => r && !r.error);
 
                 toggleLoading(false);
 
@@ -500,6 +521,55 @@ ${chunk.text}`;
                         if (videoPlayer.paused) videoPlayer.play();
                     });
                 }
+            }
+
+            function handleExport() {
+                if (analysisData.length === 0) {
+                    renderAnalysisError("沒有可匯出的分析結果，請先進行主題分析。");
+                    return;
+                }
+                const exportObj = {
+                    version: 1,
+                    exportedAt: new Date().toISOString(),
+                    topics: analysisData
+                };
+                const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `videosurfer-analysis-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            function handleImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importObj = JSON.parse(e.target.result);
+                        const topics = importObj.topics;
+                        if (!Array.isArray(topics) || topics.length === 0) {
+                            throw new Error("檔案中沒有有效的分析資料。");
+                        }
+                        analysisData = topics;
+                        analysisResults.innerHTML = '';
+                        topics.forEach(item => {
+                            const el = document.createElement('div');
+                            analysisResults.appendChild(el);
+                            renderSingleResult(el, item);
+                        });
+                        switchTab('analysis');
+                    } catch (err) {
+                        renderAnalysisError(`匯入失敗：${err.message}`);
+                        switchTab('analysis');
+                    }
+                };
+                reader.readAsText(file);
+                // 重設 input 以便重複匯入同一檔案
+                event.target.value = '';
             }
 
             function renderAnalysisError(message) {
