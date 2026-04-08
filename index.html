@@ -140,6 +140,10 @@
 
                 <!-- Tab Content: Analysis -->
                 <div id="content-analysis" class="tab-content flex-grow flex flex-col min-h-0">
+                    <div class="relative mb-3 shrink-0">
+                        <input type="text" id="analysisSearchInput" placeholder="搜尋主題..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-purple-500 transition">
+                        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
                     <div class="flex gap-2 mb-3 shrink-0">
                         <button id="exportButton" class="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center">
                             <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
@@ -183,6 +187,7 @@
             const progressText = document.getElementById('progressText');
             const exportButton = document.getElementById('exportButton');
             const importFile = document.getElementById('importFile');
+            const analysisSearchInput = document.getElementById('analysisSearchInput');
 
             // --- 狀態變數 ---
             const MAX_CONCURRENCY = 3;
@@ -197,6 +202,7 @@
             analyzeButton.addEventListener('click', handleAnalyzeClick);
             exportButton.addEventListener('click', handleExport);
             importFile.addEventListener('change', handleImport);
+            analysisSearchInput.addEventListener('input', performAnalysisSearch);
             tabSearch.addEventListener('click', () => switchTab('search'));
             tabAnalysis.addEventListener('click', () => switchTab('analysis'));
 
@@ -219,6 +225,11 @@
             function handleVideoUpload(event) {
                 const file = event.target.files[0];
                 if (file) {
+                    // 釋放前一個 blob URL
+                    if (videoPlayer.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(videoPlayer.src);
+                    }
+                    videoPlayer.pause();
                     const videoURL = URL.createObjectURL(file);
                     videoPlayer.src = videoURL;
                     videoPlayer.load();
@@ -516,6 +527,29 @@ ${chunk.text}`;
                     placeholder.addEventListener('click', () => {
                         videoPlayer.currentTime = item.startTime;
                         if (videoPlayer.paused) videoPlayer.play();
+                    });
+                }
+            }
+
+            function performAnalysisSearch() {
+                const searchTerm = analysisSearchInput.value.trim().toLowerCase();
+                if (analysisData.length === 0) return;
+
+                analysisResults.innerHTML = '';
+                const filtered = searchTerm === ''
+                    ? analysisData
+                    : analysisData.filter(item =>
+                        (item.topic || '').toLowerCase().includes(searchTerm) ||
+                        (item.description || '').toLowerCase().includes(searchTerm)
+                    );
+
+                if (filtered.length === 0) {
+                    analysisResults.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-400">找不到包含「${analysisSearchInput.value}」的主題。</p></div>`;
+                } else {
+                    filtered.forEach(item => {
+                        const el = document.createElement('div');
+                        analysisResults.appendChild(el);
+                        renderSingleResult(el, item);
                     });
                 }
             }
