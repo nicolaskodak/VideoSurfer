@@ -442,7 +442,7 @@
             }
 
             async function callGeminiAPI(chunk, apiKey, language) {
-                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
                 
                 const prompt = `你是一位影片內容分析師。請總結以下字幕文字片段的核心主題。你的回答必須是單一的 JSON 物件，且不包含任何額外的文字或 markdown 標記。JSON 物件必須包含以下三個鍵：'topic' (字串，簡短的主題標題)、'description' (字串，對主題的1-2句話描述)、'startTime' (數字，此主題開始的秒數，請直接使用字幕時間戳的第一個時間點)。你的回答必須使用【${language}】。
 
