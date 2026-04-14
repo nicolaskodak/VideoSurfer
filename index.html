@@ -125,7 +125,7 @@
                 <div class="flex border-b border-gray-700 mb-4">
                     <button id="tab-search" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition active text-sm">字幕搜尋</button>
                     <button id="tab-analysis" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition text-sm">主題分析</button>
-                    <button id="tab-bookmarks" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition text-sm">書簽</button>
+                    <button id="tab-bookmarks" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition text-sm">書籤</button>
                 </div>
 
                 <!-- Tab Content: Search -->
@@ -166,15 +166,15 @@
                     <div class="flex gap-2 mb-3 shrink-0">
                         <button id="addBookmarkButton" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center">
                             <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
-                            在目前時間加書簽 (B)
+                            在目前時間加書籤 (B)
                         </button>
                     </div>
                     <div class="relative mb-3 shrink-0">
-                        <input type="text" id="bookmarkSearchInput" placeholder="搜尋書簽..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-rose-500 transition">
+                        <input type="text" id="bookmarkSearchInput" placeholder="搜尋書籤..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-rose-500 transition">
                         <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
                     <div id="bookmarkResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0">
-                        <div class="flex items-center justify-center h-full"><p class="text-gray-500">上傳影片後可在此新增書簽。</p></div>
+                        <div class="flex items-center justify-center h-full"><p class="text-gray-500">上傳影片後可在此新增書籤。</p></div>
                     </div>
                 </div>
             </aside>
@@ -305,7 +305,7 @@
                 try {
                     localStorage.setItem(bookmarkStorageKey(currentVideoFingerprint), JSON.stringify(bookmarkData));
                 } catch (e) {
-                    console.warn('儲存書簽失敗', e);
+                    console.warn('儲存書籤失敗', e);
                 }
             }
 
@@ -315,7 +315,7 @@
                     return;
                 }
                 const time = videoPlayer.currentTime;
-                const note = prompt(`在 [${formatTime(time)}] 新增書簽，輸入註記（可留空）：`, '');
+                const note = prompt(`在 [${formatTime(time)}] 新增書籤，輸入註記（可留空）：`, '');
                 if (note === null) return;
                 bookmarkData.push({
                     id: `bm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -334,7 +334,7 @@
                 bookmarkResults.innerHTML = '';
 
                 if (bookmarkData.length === 0) {
-                    bookmarkResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">尚無書簽，按「在目前時間加書簽」或 B 鍵新增。</p></div>';
+                    bookmarkResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">尚無書籤，按「在目前時間加書籤」或 B 鍵新增。</p></div>';
                     return;
                 }
 
@@ -343,7 +343,7 @@
                     : bookmarkData.filter(b => (b.note || '').toLowerCase().includes(term));
 
                 if (filtered.length === 0) {
-                    bookmarkResults.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-400">找不到包含「${bookmarkSearchInput.value}」的書簽。</p></div>`;
+                    bookmarkResults.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-400">找不到包含「${bookmarkSearchInput.value}」的書籤。</p></div>`;
                     return;
                 }
 
@@ -368,14 +368,14 @@
                         if (videoPlayer.paused) videoPlayer.play();
                     });
                     el.querySelector('.edit-btn').addEventListener('click', () => {
-                        const next = prompt('編輯書簽註記：', bm.note || '');
+                        const next = prompt('編輯書籤註記：', bm.note || '');
                         if (next === null) return;
                         bm.note = next.trim();
                         saveBookmarks();
                         renderBookmarks();
                     });
                     el.querySelector('.delete-btn').addEventListener('click', () => {
-                        if (!confirm(`刪除 [${formatTime(bm.time)}] 這個書簽？`)) return;
+                        if (!confirm(`刪除 [${formatTime(bm.time)}] 這個書籤？`)) return;
                         bookmarkData = bookmarkData.filter(x => x.id !== bm.id);
                         saveBookmarks();
                         renderBookmarks();
@@ -708,7 +708,7 @@ ${chunk.text}`;
 
             function handleExport() {
                 if (analysisData.length === 0 && bookmarkData.length === 0) {
-                    renderAnalysisError("沒有可匯出的資料，請先進行主題分析或新增書簽。");
+                    renderAnalysisError("沒有可匯出的資料，請先進行主題分析或新增書籤。");
                     return;
                 }
                 const exportObj = {
@@ -738,7 +738,7 @@ ${chunk.text}`;
                         const topics = Array.isArray(importObj.topics) ? importObj.topics : [];
                         const bookmarks = Array.isArray(importObj.bookmarks) ? importObj.bookmarks : [];
                         if (topics.length === 0 && bookmarks.length === 0) {
-                            throw new Error("檔案中沒有有效的分析或書簽資料。");
+                            throw new Error("檔案中沒有有效的分析或書籤資料。");
                         }
 
                         if (topics.length > 0) {
