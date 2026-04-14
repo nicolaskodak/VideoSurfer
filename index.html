@@ -123,8 +123,9 @@
             <aside class="lg:w-1/3 bg-gray-800 p-4 rounded-xl shadow-2xl flex flex-col h-[70vh] lg:h-[80vh]">
                 <!-- Tabs -->
                 <div class="flex border-b border-gray-700 mb-4">
-                    <button id="tab-search" class="tab-btn flex-1 py-2 px-4 text-gray-400 font-semibold rounded-t-lg transition active">字幕搜尋</button>
-                    <button id="tab-analysis" class="tab-btn flex-1 py-2 px-4 text-gray-400 font-semibold rounded-t-lg transition">主題分析</button>
+                    <button id="tab-search" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition active text-sm">字幕搜尋</button>
+                    <button id="tab-analysis" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition text-sm">主題分析</button>
+                    <button id="tab-bookmarks" class="tab-btn flex-1 py-2 px-3 text-gray-400 font-semibold rounded-t-lg transition text-sm">書簽</button>
                 </div>
 
                 <!-- Tab Content: Search -->
@@ -147,16 +148,33 @@
                     <div class="flex gap-2 mb-3 shrink-0">
                         <button id="exportButton" class="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center">
                             <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-                            匯出分析
+                            匯出資料
                         </button>
                         <label id="importButton" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center cursor-pointer">
                             <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-                            匯入分析
+                            匯入資料
                             <input type="file" id="importFile" accept=".json" class="hidden">
                         </label>
                     </div>
                     <div id="analysisResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0">
                         <div class="flex items-center justify-center h-full"><p class="text-gray-500">點擊「分析主題」以開始。</p></div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Bookmarks -->
+                <div id="content-bookmarks" class="tab-content flex-grow flex flex-col min-h-0">
+                    <div class="flex gap-2 mb-3 shrink-0">
+                        <button id="addBookmarkButton" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center">
+                            <svg class="w-4 h-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
+                            在目前時間加書簽 (B)
+                        </button>
+                    </div>
+                    <div class="relative mb-3 shrink-0">
+                        <input type="text" id="bookmarkSearchInput" placeholder="搜尋書簽..." class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-rose-500 transition">
+                        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <div id="bookmarkResults" class="flex-grow overflow-y-auto pr-2 custom-scrollbar min-h-0">
+                        <div class="flex items-center justify-center h-full"><p class="text-gray-500">上傳影片後可在此新增書簽。</p></div>
                     </div>
                 </div>
             </aside>
@@ -179,8 +197,13 @@
             const analyzeIcon = document.getElementById('analyzeIcon');
             const tabSearch = document.getElementById('tab-search');
             const tabAnalysis = document.getElementById('tab-analysis');
+            const tabBookmarks = document.getElementById('tab-bookmarks');
             const contentSearch = document.getElementById('content-search');
             const contentAnalysis = document.getElementById('content-analysis');
+            const contentBookmarks = document.getElementById('content-bookmarks');
+            const addBookmarkButton = document.getElementById('addBookmarkButton');
+            const bookmarkResults = document.getElementById('bookmarkResults');
+            const bookmarkSearchInput = document.getElementById('bookmarkSearchInput');
 
             const progressContainer = document.getElementById('progressContainer');
             const progressBar = document.getElementById('progressBar');
@@ -194,6 +217,8 @@
             let subtitleTrack = null;
             let currentCues = [];
             let analysisData = []; // 儲存分析結果供匯出
+            let bookmarkData = [];
+            let currentVideoFingerprint = null;
 
             // --- 事件監聽器 ---
             videoUpload.addEventListener('change', handleVideoUpload);
@@ -205,35 +230,162 @@
             analysisSearchInput.addEventListener('input', performAnalysisSearch);
             tabSearch.addEventListener('click', () => switchTab('search'));
             tabAnalysis.addEventListener('click', () => switchTab('analysis'));
+            tabBookmarks.addEventListener('click', () => switchTab('bookmarks'));
+            addBookmarkButton.addEventListener('click', handleAddBookmark);
+            bookmarkSearchInput.addEventListener('input', renderBookmarks);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'b' || e.key === 'B') {
+                    const tag = (e.target.tagName || '').toLowerCase();
+                    if (tag === 'input' || tag === 'textarea') return;
+                    e.preventDefault();
+                    handleAddBookmark();
+                }
+            });
 
             // --- 函式 ---
 
             function switchTab(tabName) {
-                if (tabName === 'search') {
-                    tabSearch.classList.add('active');
-                    tabAnalysis.classList.remove('active');
-                    contentSearch.classList.add('active');
-                    contentAnalysis.classList.remove('active');
-                } else {
-                    tabAnalysis.classList.add('active');
-                    tabSearch.classList.remove('active');
-                    contentAnalysis.classList.add('active');
-                    contentSearch.classList.remove('active');
+                const tabs = {
+                    search: [tabSearch, contentSearch],
+                    analysis: [tabAnalysis, contentAnalysis],
+                    bookmarks: [tabBookmarks, contentBookmarks],
+                };
+                Object.entries(tabs).forEach(([name, [btn, content]]) => {
+                    const active = name === tabName;
+                    btn.classList.toggle('active', active);
+                    content.classList.toggle('active', active);
+                });
+            }
+
+            async function handleVideoUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                // 釋放前一個 blob URL
+                if (videoPlayer.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(videoPlayer.src);
+                }
+                videoPlayer.pause();
+                const videoURL = URL.createObjectURL(file);
+                videoPlayer.src = videoURL;
+                videoPlayer.load();
+
+                currentVideoFingerprint = await computeVideoFingerprint(file);
+                bookmarkData = loadBookmarks(currentVideoFingerprint);
+                renderBookmarks();
+            }
+
+            async function computeVideoFingerprint(file) {
+                try {
+                    const slice = file.slice(0, Math.min(file.size, 1024 * 1024));
+                    const buf = await slice.arrayBuffer();
+                    const hash = await crypto.subtle.digest('SHA-256', buf);
+                    const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+                    return `${hex.slice(0, 16)}-${file.size}`;
+                } catch (e) {
+                    return `${file.name}-${file.size}`;
                 }
             }
 
-            function handleVideoUpload(event) {
-                const file = event.target.files[0];
-                if (file) {
-                    // 釋放前一個 blob URL
-                    if (videoPlayer.src.startsWith('blob:')) {
-                        URL.revokeObjectURL(videoPlayer.src);
-                    }
-                    videoPlayer.pause();
-                    const videoURL = URL.createObjectURL(file);
-                    videoPlayer.src = videoURL;
-                    videoPlayer.load();
+            function bookmarkStorageKey(fp) {
+                return `videosurfer_bookmarks_${fp}`;
+            }
+
+            function loadBookmarks(fp) {
+                if (!fp) return [];
+                try {
+                    const raw = localStorage.getItem(bookmarkStorageKey(fp));
+                    return raw ? JSON.parse(raw) : [];
+                } catch (e) {
+                    return [];
                 }
+            }
+
+            function saveBookmarks() {
+                if (!currentVideoFingerprint) return;
+                try {
+                    localStorage.setItem(bookmarkStorageKey(currentVideoFingerprint), JSON.stringify(bookmarkData));
+                } catch (e) {
+                    console.warn('儲存書簽失敗', e);
+                }
+            }
+
+            function handleAddBookmark() {
+                if (!videoPlayer.src || !currentVideoFingerprint) {
+                    alert('請先上傳影片。');
+                    return;
+                }
+                const time = videoPlayer.currentTime;
+                const note = prompt(`在 [${formatTime(time)}] 新增書簽，輸入註記（可留空）：`, '');
+                if (note === null) return;
+                bookmarkData.push({
+                    id: `bm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                    time,
+                    note: note.trim(),
+                    createdAt: new Date().toISOString(),
+                });
+                bookmarkData.sort((a, b) => a.time - b.time);
+                saveBookmarks();
+                renderBookmarks();
+                switchTab('bookmarks');
+            }
+
+            function renderBookmarks() {
+                const term = (bookmarkSearchInput.value || '').trim().toLowerCase();
+                bookmarkResults.innerHTML = '';
+
+                if (bookmarkData.length === 0) {
+                    bookmarkResults.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">尚無書簽，按「在目前時間加書簽」或 B 鍵新增。</p></div>';
+                    return;
+                }
+
+                const filtered = term === ''
+                    ? bookmarkData
+                    : bookmarkData.filter(b => (b.note || '').toLowerCase().includes(term));
+
+                if (filtered.length === 0) {
+                    bookmarkResults.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-400">找不到包含「${bookmarkSearchInput.value}」的書簽。</p></div>`;
+                    return;
+                }
+
+                filtered.forEach(bm => {
+                    const el = document.createElement('div');
+                    el.className = 'p-3 mb-2 bg-gray-700 rounded-lg hover:bg-rose-700 transition-colors duration-200 animate-fadeIn';
+                    const noteHtml = bm.note
+                        ? `<div class="text-gray-200 text-sm">${escapeHtml(bm.note)}</div>`
+                        : `<div class="text-gray-500 italic text-sm">（無註記）</div>`;
+                    el.innerHTML = `
+                        <div class="flex items-center justify-between mb-1">
+                            <button class="jump-btn font-mono text-sm text-rose-300 hover:text-white">[${formatTime(bm.time)}]</button>
+                            <div class="flex gap-2 text-xs">
+                                <button class="edit-btn text-gray-300 hover:text-white">編輯</button>
+                                <button class="delete-btn text-gray-300 hover:text-red-300">刪除</button>
+                            </div>
+                        </div>
+                        ${noteHtml}
+                    `;
+                    el.querySelector('.jump-btn').addEventListener('click', () => {
+                        videoPlayer.currentTime = bm.time;
+                        if (videoPlayer.paused) videoPlayer.play();
+                    });
+                    el.querySelector('.edit-btn').addEventListener('click', () => {
+                        const next = prompt('編輯書簽註記：', bm.note || '');
+                        if (next === null) return;
+                        bm.note = next.trim();
+                        saveBookmarks();
+                        renderBookmarks();
+                    });
+                    el.querySelector('.delete-btn').addEventListener('click', () => {
+                        if (!confirm(`刪除 [${formatTime(bm.time)}] 這個書簽？`)) return;
+                        bookmarkData = bookmarkData.filter(x => x.id !== bm.id);
+                        saveBookmarks();
+                        renderBookmarks();
+                    });
+                    bookmarkResults.appendChild(el);
+                });
+            }
+
+            function escapeHtml(str) {
+                return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
             }
 
             function handleSubtitleUpload(event) {
@@ -555,20 +707,22 @@ ${chunk.text}`;
             }
 
             function handleExport() {
-                if (analysisData.length === 0) {
-                    renderAnalysisError("沒有可匯出的分析結果，請先進行主題分析。");
+                if (analysisData.length === 0 && bookmarkData.length === 0) {
+                    renderAnalysisError("沒有可匯出的資料，請先進行主題分析或新增書簽。");
                     return;
                 }
                 const exportObj = {
-                    version: 1,
+                    version: 2,
                     exportedAt: new Date().toISOString(),
-                    topics: analysisData
+                    videoFingerprint: currentVideoFingerprint,
+                    topics: analysisData,
+                    bookmarks: bookmarkData
                 };
                 const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `videosurfer-analysis-${Date.now()}.json`;
+                a.download = `videosurfer-data-${Date.now()}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
             }
@@ -581,18 +735,34 @@ ${chunk.text}`;
                 reader.onload = (e) => {
                     try {
                         const importObj = JSON.parse(e.target.result);
-                        const topics = importObj.topics;
-                        if (!Array.isArray(topics) || topics.length === 0) {
-                            throw new Error("檔案中沒有有效的分析資料。");
+                        const topics = Array.isArray(importObj.topics) ? importObj.topics : [];
+                        const bookmarks = Array.isArray(importObj.bookmarks) ? importObj.bookmarks : [];
+                        if (topics.length === 0 && bookmarks.length === 0) {
+                            throw new Error("檔案中沒有有效的分析或書簽資料。");
                         }
-                        analysisData = topics;
-                        analysisResults.innerHTML = '';
-                        topics.forEach(item => {
-                            const el = document.createElement('div');
-                            analysisResults.appendChild(el);
-                            renderSingleResult(el, item);
-                        });
-                        switchTab('analysis');
+
+                        if (topics.length > 0) {
+                            analysisData = topics;
+                            analysisResults.innerHTML = '';
+                            topics.forEach(item => {
+                                const el = document.createElement('div');
+                                analysisResults.appendChild(el);
+                                renderSingleResult(el, item);
+                            });
+                        }
+
+                        if (bookmarks.length > 0) {
+                            const existingIds = new Set(bookmarkData.map(b => b.id));
+                            bookmarks.forEach(b => {
+                                if (!b.id) b.id = `bm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                                if (!existingIds.has(b.id)) bookmarkData.push(b);
+                            });
+                            bookmarkData.sort((a, b) => a.time - b.time);
+                            saveBookmarks();
+                            renderBookmarks();
+                        }
+
+                        switchTab(topics.length > 0 ? 'analysis' : 'bookmarks');
                     } catch (err) {
                         renderAnalysisError(`匯入失敗：${err.message}`);
                         switchTab('analysis');
